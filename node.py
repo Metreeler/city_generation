@@ -29,7 +29,7 @@ class Node:
         self.y:float = y
         self.size:int = size
         self.radius:int = radius
-        self.neighbors:list[Node] = []
+        self.neighbors:set[Node] = set()
         self.main_node:bool = main_node
         self.city_outskirt:bool = city_outskirt
         self.part_of_city:bool = part_of_city
@@ -49,11 +49,26 @@ class Node:
     def __lt__(self, other):
         return self.x + self.y < other.x + other.y
     
+    def __sub__(self, other):
+        return Node(self.x - other.x, self.y - other.y, self.size, self.radius)
+    
+    def __add__(self, other):
+        return Node(self.x + other.x, self.y + other.y, self.size, self.radius)
+    
     def __hash__(self):
         return hash((self.x, self.y))
     
     def __str__(self):
         return str(self.x) + ", " + str(self.y)
+    
+    def dot_product(self, other):
+        return self.x * other.x + self.y * other.y
+    
+    def get_norm(self):
+        return np.sqrt(self.x ** 2 + self.y ** 2)
+    
+    def in_rectangle(self, x1, y1, x2, y2):
+        return x1 <= self.x <= x2 and y1 <= self.y <= y2
     
     def draw(self, src, color):
         cv.circle(src, center=(int(self.y), int(self.x)), radius = self.size, color=color, thickness=-1)
@@ -66,14 +81,21 @@ class Node:
             self.draw_path_to_node(src, neighbor, color)
 
     def draw_path_to_node(self, src, node, color):
-        cv.line(src, (self.y, self.x), (node.y, node.x), color, 2)
+        cv.line(src, (int(self.y), int(self.x)), (int(node.y), int(node.x)), color, 2)
     
     def distance_to(self, node):
         return np.sqrt((self.x - node.x) ** 2 + (self.y - node.y) ** 2)
     
+    def constrain_in_area(self, row, col):
+        if row >= self.x >= 0 and col >= self.y >= 0:
+            return self
+        x = min(max(self.x, 0), row)
+        y = min(max(self.y, 0), col)
+        return Node(x, y, self.size, self.radius, self.main_node, self.part_of_city, self.city_outskirt)
+    
     def add_neighbor(self, node):
-        if node not in self.neighbors:
-            self.neighbors.append(node)
+        self.neighbors.add(node)
+        node.neighbors.add(self)
 
 
 def a_star(nodes: list[Node], starting_node:Node, ending_node:Node):

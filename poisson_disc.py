@@ -30,15 +30,24 @@ class PoissonDisc:
             radii
         ):
 
-        random_i = np.tile(np.arange(row), (col, 1))
-        random_j = np.tile(np.arange(col), (row, 1)).T
+        random_i = np.tile(np.arange(row), (col, 1)).T
+        random_j = np.tile(np.arange(col), (row, 1))
 
         random = random_number(seed, random_i, random_j)
         
         new_node_terrain = random * zone_to_cover
         available = new_node_terrain.copy()
         
-        nodes:list[Node] = []
+        nodes:list[Node] = [
+            # Node(0, 0, 5, 100),
+            # Node(row, 0, 5, 100),
+            # Node(0, col, 5, 100),
+            # Node(row, col, 5, 100),
+        ]
+
+        for n in nodes:
+            cv.circle(available, center=(n.y, n.x), radius=n.radius, color=(0, 0, 0), thickness=-1)
+
 
         terrain_opened = np.zeros((row, col))
 
@@ -74,10 +83,10 @@ if __name__=="__main__":
 
     distribution = PoissonDisc(seed, row, col, src, radii)
     
-    out = np.zeros((row, col, 3))
+    poisson_drawn = np.zeros((row, col, 3))
 
-    print(len(distribution.nodes))
-    distribution.draw(out, (255, 255, 255))
+    print('Poisson disc with ', len(distribution.nodes), ' nodes')
+    distribution.draw(poisson_drawn, (255, 255, 255))
 
     cv.imwrite("data/web-display/assets/radii.png", (radii * 255).astype(np.uint8))
-    cv.imwrite("data/web-display/assets/out.png", (out).astype(np.uint8))
+    cv.imwrite("data/web-display/assets/out.png", (poisson_drawn).astype(np.uint8))

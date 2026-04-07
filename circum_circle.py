@@ -1,5 +1,6 @@
 from node import Node
 import numpy as np
+import cv2 as cv
 
 class CircumCircle:
     def __init__(self, nodes:list[Node]):
@@ -22,7 +23,10 @@ class CircumCircle:
         c_squared = C.x ** 2 + C.y ** 2
         det_x = a_squared * (B.y - C.y) - b_squared * (A.y - C.y) + c_squared * (A.y - B.y)
         det_y = a_squared * (B.x - C.x) - b_squared * (A.x - C.x) + c_squared * (A.x - B.x)
-        return Node(det_x / (2 * det), - det_y / (2 * det), 0, 0)
+        return Node(det_x / (2 * det), - det_y / (2 * det), 5, 0)
     
     def contains_node(self, node:Node):
         return node.distance_to(self.center) < self.radius
+
+    def draw(self, src, color):
+        cv.circle(src, (int(self.center.y), int(self.center.x)), int(self.radius), color)

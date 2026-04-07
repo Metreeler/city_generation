@@ -12,27 +12,35 @@ class Polygon:
         self.vertices:list[Node] = []
         self.neighbours:list[Node] = neighbors
         self.complete:bool = False
+        self.outer_poly:bool = False
     
     def draw(self, src, color):
-        self.order_vertices()
-
         vertices = []
 
         for n in self.vertices:
             vertices.append((n.y, n.x))
 
-        vertices = np.array(vertices, dtype=np.int32)
-        if self.complete:
+        # if not self.complete:
+        #     vertices = np.array(vertices, dtype=np.int32)
+        #     cv.drawContours(src, [vertices], 0, color, -1)
+        if self.outer_poly and self.complete:
+            vertices = np.array(vertices, dtype=np.int32)
+            cv.drawContours(src, [vertices], 0, (0, 0, np.random.randint(100, 255)), -1)
+        elif self.complete:
+            vertices = np.array(vertices, dtype=np.int32)
             cv.drawContours(src, [vertices], 0, color, -1)
+        elif len(vertices) > 2:
+            vertices = np.array(vertices, dtype=np.int32)
+            cv.drawContours(src, [vertices], 0, (np.random.randint(100, 255), 0, 0), -1)
+        else:
+            vertices.append((self.center.y, self.center.x))
+            vertices = np.array(vertices, dtype=np.int32)
+            cv.drawContours(src, [vertices], 0, (np.random.randint(255), np.random.randint(255), np.random.randint(255)), -1)
+            cv.circle(src, center=(self.center.y, self.center.x), radius=10, color=(100, 100, 100), thickness=-1)
+        
+        self.center.draw(src, (255, 255, 255))
 
-            for n in self.neighbours:
-                cv.line(src, (self.center.y, self.center.x), (n.y, n.x), (100, 100, 100), 5)
-        elif vertices.shape[0] > 2:
-            cv.drawContours(src, [vertices], 0, (255, 255, 255), -1)
-
-        self.center.draw(src, (0, 0, 0))
-
-    def order_vertices(self) -> list[Node]:
+    def order_vertices(self, row, col):
         outer_nodes:list[Node] = [self.edges[0].n1]
 
         has_neighbor = True
@@ -45,19 +53,58 @@ class Polygon:
                 elif e.n2 == outer_nodes[-1] and e.n1 not in outer_nodes:
                     outer_nodes.append(e.n1)
                     has_neighbor = True
+                elif e.n1 == outer_nodes[0] and e.n2 not in outer_nodes:
+                    outer_nodes.insert(0, e.n2)
+                    has_neighbor = True
+                elif e.n2 == outer_nodes[0] and e.n1 not in outer_nodes:
+                    outer_nodes.insert(0, e.n1)
+                    has_neighbor = True
+        
+        for node in outer_nodes:
+            if not node.in_rectangle(0, 0, row, col):
+                self.outer_poly = True
+                break
         
         coords: list[Node] = []
         for e in self.edges:
             coords.append(e.n1)
             coords.append(e.n2)
-            
-        self.complete = True
-        for n in coords:
-            if coords.count(n) != 2:
-                self.complete = False
-                break
+        
+        if len(coords) > 2:
+            self.complete = True
+            for n in coords:
+                if coords.count(n) != 2:
+                    self.complete = False
+                    break
         
         self.vertices = outer_nodes
+    
+    def close_edges(self):
+        if not self.complete:
+            coords: list[Node] = []
+            for edge in self.edges:
+                coords.append(edge.n1)
+                coords.append(edge.n2)
+
+            unique_coords:list[Node] = []
+            for n in coords:
+                if coords.count(n) != 2:
+                    unique_coords.append(n)
+
+            if len(unique_coords) == 2:
+                n1 = unique_coords[0]
+                n2 = unique_coords[1]
+                if n1.x == n2.x or n1.y == n2.y:
+                    self.edges.append(Edge(unique_coords[0], unique_coords[1]))
+                    self.complete = True
+
+                
+    
+    def __str__(self):
+        out = "Center : " + str(self.center)
+        for e in self.edges:
+            out += "\n - " + str(e)
+        return out
 
 
 if __name__=="__main__":

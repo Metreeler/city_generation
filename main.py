@@ -6,122 +6,77 @@ import json
 
 from perlin_noise_2d import noise_layer
 from node import *
+from poisson_disc import PoissonDisc
+from delauney import Delauney
+from to_html import to_html
+from utils import reset_files
 
 
 if __name__=="__main__":
     # seed = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-    seed = "iz1xk046cg"
+    seed = '1kqojd176t'
+    print("Seed :", seed)
+
+    folder = 'data/web-display/assets'
+    reset_files(folder)
+
+    row, col = 800, 500
+    min_radius, max_radius = 100, 101
+
+    radii = min_radius + noise_layer(seed, row, col, 2, 1) * (max_radius - min_radius)
+    src = np.zeros((row, col)) + 1
+    # src[int(row / 10):int(row - row / 10), int(col / 10):int(col - col / 10)] = 1
+
+    distribution = PoissonDisc(seed, row, col, src, radii)
     
-    row, col = 2000, 2000
-    city_node_radius = 15
-    terrain_node_radius = 50
+    poisson_drawn = np.zeros((row, col, 3))
+
+    print('Poisson disc with ', len(distribution.nodes), ' nodes')
+    distribution.draw(poisson_drawn, (255, 255, 255))
+
+    cv.imwrite("data/web-display/assets/radii.png", ((radii - min_radius) / (max_radius - min_radius) * 255).astype(np.uint8))
+    cv.imwrite("data/web-display/assets/poisson_drawn.png", (poisson_drawn).astype(np.uint8))
+
+    delauney = Delauney(row, col, distribution.nodes)
+
+    # nodes:list[Node] = [
+    #     Node(400, 400, 5),
+    #     Node(100, 200, 5),
+    #     Node(300, 100, 5),
+    #     Node(200, 350, 5),
+    # ]
+
+    # delauney = Delauney(row, col, nodes)
     
-    print(seed)
-
-    terrain = np.zeros((row, col))
-    terrain[100:(row - 100), 100:(col -100)] = 1
-
-    city_mask = np.zeros((row, col))
+    delauney_drawn = np.zeros((row, col, 3))
     
-    nodes:list[Node] = []
-
-    nodes.append(Node(1000, 1000, 10, 250, main_node=True, part_of_city=True))
-    nodes.append(Node(300, 300, 10, 100, main_node=True, part_of_city=True))
-    nodes.append(Node(1700, 300, 10, 100, main_node=True, part_of_city=True))
-    nodes.append(Node(300, 1700, 10, 100, main_node=True, part_of_city=True))
-    nodes.append(Node(1700, 1700, 10, 100, main_node=True, part_of_city=True))
-
-    for node in nodes:
-        cv.circle(city_mask, center=(node.y, node.x), radius=node.radius - city_node_radius, color=(1, 1, 1), thickness=-1)
-        cv.circle(city_mask, center=(node.y, node.x), radius=city_node_radius, color=(0, 0, 0), thickness=-1)
-
-    nodes = nodes + create_mesh(seed, row, col, city_mask * terrain, city_node_radius, part_of_city=True, save=True)
+    delauney.draw_voronoi_from_nodes(delauney_drawn, (0, 0, 255))
     
-    # City outskirt creation
-
-    city_outskirt_mask = np.zeros((row, col))
-
-    for node in nodes:
-        if node.main_node:
-            cv.circle(city_outskirt_mask, center=(node.y, node.x), radius=node.radius, color=(1, 1, 1), thickness=1)
-
-    outskirt_nodes = create_mesh(seed, row, col, city_outskirt_mask * terrain, terrain_node_radius, city_outskirt=True)
-
-    closest_node:list[Node|None] = [None] * len(outskirt_nodes)
-    min_dist = np.zeros((len(outskirt_nodes))) + terrain_node_radius
-
-    for node in nodes:
-        for i in range(len(outskirt_nodes)):
-            dist = outskirt_nodes[i].distance_to(node)
-            if dist < min_dist[i]:
-                min_dist[i] = dist
-                closest_node[i] = node
+    cv.imwrite("data/web-display/assets/delauney_drawn.png", (delauney_drawn).astype(np.uint8))
     
-    for i in range(len(outskirt_nodes)):
-        if closest_node[i] is not None:
-            outskirt_nodes[i].add_neighbor(closest_node[i])
-            closest_node[i].add_neighbor(outskirt_nodes[i])
+    delauney_triangles_drawn = np.zeros((row, col, 3))
     
-    nodes = nodes + outskirt_nodes
+    delauney.draw(delauney_triangles_drawn, (0, 0, 255))
     
-    # Other nodes creation
-
-    terrain_mask = np.zeros((row, col)) + 1
-
-    for node in nodes:
-        if node.main_node or not node.part_of_city:
-            cv.circle(terrain_mask, center=(node.y, node.x), radius=node.radius, color=(0, 0, 0), thickness=-1)
-
-    nodes = nodes + create_mesh(seed, row, col, terrain_mask * terrain, terrain_node_radius)
-
+    cv.imwrite("data/web-display/assets/delauney_triangles_drawn.png", (delauney_triangles_drawn).astype(np.uint8))
+    
+    voronoi_drawn = np.zeros((row, col, 3))
+    
+    delauney.draw_voronoi(voronoi_drawn, (0, 0, 255))
+    
+    cv.imwrite("data/web-display/assets/voronoi_drawn.png", (voronoi_drawn).astype(np.uint8))
+    
+    polygons_drawn = np.zeros((row, col, 3))
+    
+    delauney.draw_polygons(polygons_drawn, (0, 0, 255))
+    
+    cv.imwrite("data/web-display/assets/polygons_drawn.png", (polygons_drawn).astype(np.uint8))
+    
     out = np.zeros((row, col, 3))
-    out[:, :, 0] = terrain * 255
-    out[:, :, 1] = terrain * 255
-    out[:, :, 2] = terrain * 255
     
-    for i in range(len(nodes) - 1):
-        for j in range(i + 1, len(nodes)):
-            if nodes[i].part_of_city and nodes[j].part_of_city:
-                if(nodes[i].distance_to(nodes[j]) < min(nodes[i].radius, nodes[j].radius) * np.sqrt(2)):
-                    nodes[i].add_neighbor(nodes[j])
-                    nodes[j].add_neighbor(nodes[i])
-            elif not nodes[i].part_of_city and not nodes[j].part_of_city:
-                if(nodes[i].distance_to(nodes[j]) < max(nodes[i].radius, nodes[j].radius) * 2):
-                    nodes[i].add_neighbor(nodes[j])
-                    nodes[j].add_neighbor(nodes[i])
+    delauney.draw(out, (0, 0, 255))
+    delauney.draw_voronoi_from_nodes(out, (0, 0, 255))
     
-    # for i in range(4):
-    #     print(a_star(nodes, nodes[i + 1], nodes[0]))
-
-    #     current_node = nodes[0]
-
-    #     while current_node.parent != None:
-    #         current_node.draw_path_to_node(out, current_node.parent, (255, 50, 50))
-    #         current_node = current_node.parent
-        
-    #     reset_a_star(nodes)
-
-    for node in nodes:
-        node.draw_path_to_neighbors(out, (255, 50, 50))
-
-    for node in nodes:
-        if node.main_node:
-            node.draw(out, (50, 255, 50))
-        else:
-            node.draw(out, (255, 50, 50))
-    
-    coords = []
-    for n in nodes:
-        coords.append({
-            "x":int(n.x),
-            "y":int(n.y),
-            "radius":int(n.radius)
-            })
-    
-    # print(coords)
-    with open("data/nodes.json", 'w', encoding ='utf8') as json_file:
-        json.dump({"data":coords}, json_file, ensure_ascii = False)
-    
-
-    cv.imwrite("data/web-display/assets/terrain.png", (terrain * 255).astype(np.uint8))
     cv.imwrite("data/web-display/assets/out.png", (out).astype(np.uint8))
+
+    to_html(folder, 'data/web-display/index.html')
